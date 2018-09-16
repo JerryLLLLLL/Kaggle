@@ -1,19 +1,20 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-import xgboost as xgb
+#import xgboost as xgb
 from xgboost import sklearn
 import math
-import seaborn as sns
-import statsmodels.api as sm
-from statsmodels.tsa.stattools import adfuller
-from statsmodels.tsa.stattools import acf,pacf
-from statsmodels.tsa.seasonal import seasonal_decompose
-from statsmodels.graphics.tsaplots import plot_acf,plot_pacf
-from statsmodels.tsa.arima_model import ARIMA
+from sklearn.model_selection import train_test_split
+#import seaborn as sns
+#import statsmodels.api as sm
+#from statsmodels.tsa.stattools import adfuller
+#from statsmodels.tsa.stattools import acf,pacf
+#from statsmodels.tsa.seasonal import seasonal_decompose
+#from statsmodels.graphics.tsaplots import plot_acf,plot_pacf
+#from statsmodels.tsa.arima_model import ARIMA
 
 ###################data process#######################
-path = r"E:\DATA\StoreItem"
+path = r"D:/Script/Data"
 dateparser = lambda date: pd.datetime.strptime(date,"%Y-%m-%d")
 train_file = pd.read_csv(path+"/train.csv")
 test_file = pd.read_csv(path+"/test.csv")
@@ -71,12 +72,13 @@ plt.ylabel("Relative Sales")
 plt.show()
 
 
-#现在的变量还有store和item,均属于分类变量,为了便于解释结果,进行哑变量处理
+#handling dummy varibles
 train_x_dummy = pd.get_dummies(train_x,prefix=["store","item","wday"],columns=["store","item","wday"])
 test_x_dummy = pd.get_dummies(test_x,prefix=["store","item","wday"],columns=["store","item","wday"])
 
 
-###################建立模型 xgboost##############################
+###################build model: xgboost##############################
+#Measurement
 def SMAPE(pred,sales):
     if len(pred)!=len(sales):
         raise BaseException("Length of two variables are different!")
@@ -87,12 +89,15 @@ def SMAPE(pred,sales):
         smape += temp
     return smape
 
+
+#Model Function to choose best parameters
 def test_model(param,data_x,data_y,metric=SMAPE):
     model = sklearn.XGBRegressor(**param)
-    train_x = data_x[data_x.index.year!=2017]
-    test_x = data_x[data_x.index.year==2017]
-    train_y = data_y[data_y.index.year!=2017]
-    test_y = data_y[data_y.index.year==2017]
+    #train_x = data_x[data_x.index.year!=2017]
+    #test_x = data_x[data_x.index.year==2017]
+    #train_y = data_y[data_y.index.year!=2017]
+    #test_y = data_y[data_y.index.year==2017]
+    train_x,test_x,train_y,test_y = train_test_split(data_x,data_y,test_size=0.2,random_state=28)
     print("Start fitting...")
     model.fit(train_x,train_y,eval_metric="auc")
     print("Fitting done. Start predicting...")
@@ -113,38 +118,8 @@ param = {"learning_rate":0.1,"n_estimators":1000,"max_depth":5,
 model,smape = test_model(param,train_x_dummy,train_y)
 
         
-#定义函数比对预测值与真实值之间的误差
-def MSE(pred,sales):
-    if len(pred)!=len(sales):
-        raise BaseException("Length of two variables are different!")
-    mse = 0.0
-    for i in range(len(pred)):
-        temp = (pred[i]-sales[i])**2
-        mse = mse + temp
-    mse = mse/len(pred)
-    return mse
-
-
-def SMAPE(pred,sales):
-    if len(pred)!=len(sales):
-        raise BaseException("Length of two variables are different!")
-    n = len(pred)
-    smape = 0.0
-    for i in range(n):
-        temp = math.abs(pred-sales)/((math.abs(pred)+math.abs(sales))/2)
-        smape += temp
-    return smape
 
 
     
         
-pred_test = model.predict(test_x)   
-
-
-
-
-
-################################Time Series########################
-        
-
-
+pred_test = model.predict(test_x) 
