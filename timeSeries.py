@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 #import xgboost as xgb
 from xgboost import sklearn
 import math
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split,GridSearchCV
 #import seaborn as sns
 #import statsmodels.api as sm
 #from statsmodels.tsa.stattools import adfuller
@@ -20,26 +20,18 @@ train_file = pd.read_csv(path+"/train.csv")
 test_file = pd.read_csv(path+"/test.csv")
 date_train = train_file["date"].apply(dateparser)
 date_test = test_file["date"].apply(dateparser)
-#将index转化为时间
+#Turn index into time format
 train_file = train_file.set_index(date_train)
 test_file = test_file.set_index(date_test)
 
-'''
-date2int = lambda date: int(date[0:4]+date[5:7]+date[8:10])
-train = train_file
-test = test_file
-train["date"] = train["date"].apply(date2int)
-test["date"] = test["date"].apply(date2int)
-train_x = train[["store","item","date"]]
-test_x = test[["store","item","date"]]
-train_y = train["sales"]
-'''
+
 train = train_file.copy()
 test = test_file.copy()
 
-#观察数据后,决定对日期值进行拆分
-#可以考虑日期的特殊性,如周中,周末,月初,月末,增加新特征
-#用于添加列
+
+#After notice, we decide to split the "Date"
+#Considering some special day, such as weekday, weekend, beginning of month, end of month, we can add some new features.
+#Below function is to add new columns
 def expand_df(df):
     data = df.copy()
     data["day"] = data.index.day
@@ -53,7 +45,8 @@ train_y = expand_df(train)["sales"]
 
 test_x = expand_df(test)
 
-#简单分析 画图
+#Simple Analyse & Plot
+#Show Time--Store Sales & Time--Item Sales Plot
 train_all = expand_df(train)
 agg_year_item = pd.pivot_table(train_all,index="year",columns="item",values="sales",aggfunc=np.mean).values
 agg_year_store = pd.pivot_table(train_all, index='year', columns='store',values='sales', aggfunc=np.mean).values
@@ -75,7 +68,7 @@ plt.show()
 #handling dummy varibles
 train_x_dummy = pd.get_dummies(train_x,prefix=["store","item","wday"],columns=["store","item","wday"])
 test_x_dummy = pd.get_dummies(test_x,prefix=["store","item","wday"],columns=["store","item","wday"])
-
+test_x_dummy.drop("id",axis=1,inplace=True)
 
 ###################build model: xgboost##############################
 #Measurement
@@ -89,8 +82,8 @@ def SMAPE(pred,sales):
         smape += temp
     return smape
 
-
-#Model Function to choose best parameters
+"""
+#Model Function, return Model&SMAPE
 def test_model(param,data_x,data_y,metric=SMAPE):
     model = sklearn.XGBRegressor(**param)
     #train_x = data_x[data_x.index.year!=2017]
@@ -111,15 +104,33 @@ def test_model(param,data_x,data_y,metric=SMAPE):
     test_plot[(test_plot["store"]==2)&(test_plot["item"]==2)][["sales","pred"]].plot()
     smape = metric(pred,test_y)
     return model,smape
-    
-param = {"learning_rate":0.1,"n_estimators":1000,"max_depth":5,
- "min_child_weight":1,"gamma":0,"subsample":1,"colsample_bytree":1,
- "objective":'reg:linear',"nthread":4,"scale_pos_weight":1,"seed":27}
-model,smape = test_model(param,train_x_dummy,train_y)
+"""    
+#param = {"learning_rate":0.1,"n_estimators":1000,"max_depth":5,
+# "min_child_weight":1,"gamma":0,"subsample":1,"colsample_bytree":1,
+# "objective":'reg:linear',"nthread":4,"scale_pos_weight":1,"seed":27}
+param = {"gamma":0,"subsample":1,"colsample_bytree":1,
+         "objective":'reg:linear',"nthread":4,"seed":27}
+model = sklearn.XGBRegressor(**param)
+param_cv_1 = {"learning_rate":[0.01,0.02,0.03,0.04,0.05,0.06,0.07,0.08,0.09,0.1,0.11,0.12,0.13,0.14,0.15]}
+param_cv_2 = {"n_estimators":[int(x) for x in np.linspace(100,2000,20)]}
+param_cv_3 = {"max_depth":[3,4,5,6,7,8]}
+param_cv_4 = {"min_child_weight":[0.5,0.6,0.7,0.8,0.9,1.0,1.1,1.2,1.3,1.4,1.5]}
+param_cv_5 = {"scale_pos_weight":[0.5,0.6,0.7,0.8,0.9,1.0,1.1,1.2,1.3,1.4,1.5]}
 
-        
+def choose_best_param(model,param_cv,data_x,data_y):
+    clf = GridSearchCV(estimator=model,param_grid=param_cv,error_score=SMAPE)
+    clf.fit(data_x,data_y)
+    return clf.best_params_
+
+param_all = [param_cv_1,param_cv_2,param_cv_3,param_cv_4,param_cv_5]
+best_param = param.copy()
+for p in param_all:
+    temp_param = choose_best_param(model,p,train_x_dummy,train_y)
+    best_param.update(temp_param)
 
 
-    
-        
-pred_test = model.predict(test_x) 
+update_model = sklearn.XGBRegressor(**best_param)
+update_model.fit(train_x_dummy,train_y)  
+
+
+pred_test = model.predict(test_x_dummy) 
