@@ -1,9 +1,15 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Thu Aug 23 00:03:25 2018
+
+@author: Jerry
+"""
+
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 #import xgboost as xgb
 from xgboost import sklearn
-import math
 from sklearn.model_selection import train_test_split,GridSearchCV
 #import seaborn as sns
 #import statsmodels.api as sm
@@ -80,7 +86,7 @@ def SMAPE(pred,sales):
     for i in range(n):
         temp = abs(pred[i]-sales[i])/((abs(pred[i])+abs(sales[i]))/2)
         smape += temp
-    return smape
+    return "error",smape
 
 """
 #Model Function, return Model&SMAPE
@@ -108,9 +114,10 @@ def test_model(param,data_x,data_y,metric=SMAPE):
 #param = {"learning_rate":0.1,"n_estimators":1000,"max_depth":5,
 # "min_child_weight":1,"gamma":0,"subsample":1,"colsample_bytree":1,
 # "objective":'reg:linear',"nthread":4,"scale_pos_weight":1,"seed":27}
-param = {"gamma":0,"subsample":1,"colsample_bytree":1,
-         "objective":'reg:linear',"nthread":4,"seed":27}
+param = {"learning_rate":0.8,"gamma":0,"subsample":1,"colsample_bytree":1,"max_depth":5,
+         "objective":'reg:linear',"seed":27}
 model = sklearn.XGBRegressor(**param)
+"""
 param_cv_1 = {"learning_rate":[0.01,0.02,0.03,0.04,0.05,0.06,0.07,0.08,0.09,0.1,0.11,0.12,0.13,0.14,0.15]}
 param_cv_2 = {"n_estimators":[int(x) for x in np.linspace(100,2000,20)]}
 param_cv_3 = {"max_depth":[3,4,5,6,7,8]}
@@ -122,6 +129,7 @@ def choose_best_param(model,param_cv,data_x,data_y):
     clf.fit(data_x,data_y)
     return clf.best_params_
 
+
 param_all = [param_cv_1,param_cv_2,param_cv_3,param_cv_4,param_cv_5]
 best_param = param.copy()
 for p in param_all:
@@ -131,6 +139,12 @@ for p in param_all:
 
 update_model = sklearn.XGBRegressor(**best_param)
 update_model.fit(train_x_dummy,train_y)  
-
-
+"""
+model.fit(train_x_dummy,train_y)
 pred_test = model.predict(test_x_dummy) 
+uid = test_x["id"]
+
+result = pd.DataFrame({"id":uid,"pred":pred_test})
+result.index = range(len(result))
+result.to_csv(path+"/Prediction.csv")
+
