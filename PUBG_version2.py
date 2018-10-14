@@ -47,5 +47,15 @@ sns.jointplot(x="winPlacePerc",y="longestKill",data=data)
 team = train.groupby("groupId").mean()
 team.drop(["Id","matchId","numGroups"],axis=1,inplace=True)
 
-
+lists = ["kills","DBNOs","assists","boosts"]
+fig,axes = plt.subplots(nrows=2,ncols=2,figsize=(10,10))
+for i in range(2):
+    for j in range(2):
+        idx = i*2+j
+        if idx < 4:
+            sns.boxplot(x=lists[idx],y="winPlacePerc",data=data,ax=axes[i][j])
+            axes[i][j].set_title(lists[idx])
+fig.suptitle()
+plt.tight_layout()
+plt.show()
 
